@@ -87,9 +87,31 @@ section h3 {
 }
 
 .activity-card .participants-list {
-  list-style: disc;
-  padding-left: 20px;
+  /* Hide default bullets and remove left padding so items align cleanly */
+  list-style: none;
+  padding-left: 0;
   margin: 0;
+}
+
+.activity-card .participant-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.activity-card .delete-participant {
+  background: transparent;
+  border: none;
+  color: #c62828;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.activity-card .delete-participant:hover {
+  background: rgba(198,40,40,0.08);
 }
 
 .activity-card .participant-item {

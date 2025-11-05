@@ -34,9 +34,13 @@ document.addEventListener("DOMContentLoaded", () => {
         // Build participants fragment
         let participantsHTML = "";
         if (Array.isArray(details.participants) && details.participants.length > 0) {
+          // Build participants list with a delete button for each participant
           participantsHTML = `<ul class="participants-list">` +
             details.participants
-              .map((p) => `<li class="participant-item">${escapeHtml(p)}</li>`)
+              .map((p) =>
+                `<li class="participant-item"><span class="participant-email">${escapeHtml(p)}</span>` +
+                `<button class="delete-participant" title="Unregister">✖</button></li>`
+              )
               .join("") +
             `</ul>`;
         } else {
@@ -55,6 +59,42 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
 
         activitiesList.appendChild(activityCard);
+
+        // Attach unregister handlers to the delete buttons we just rendered
+        const deleteButtons = activityCard.querySelectorAll('.delete-participant');
+        deleteButtons.forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            // Find the participant email from the sibling span (unescaped text)
+            const li = btn.closest('.participant-item');
+            if (!li) return;
+            const emailSpan = li.querySelector('.participant-email');
+            if (!emailSpan) return;
+            const email = emailSpan.textContent.trim();
+
+            // Disable button while request is in-flight
+            btn.disabled = true;
+
+            try {
+              const resp = await fetch(
+                `/activities/${encodeURIComponent(name)}/unregister?email=${encodeURIComponent(email)}`,
+                { method: 'POST' }
+              );
+
+              if (resp.ok) {
+                // Refresh the activities to reflect the change
+                fetchActivities();
+              } else {
+                // Try to show error in console and keep UI stable
+                const data = await resp.json().catch(() => ({}));
+                console.error('Failed to unregister:', data);
+              }
+            } catch (err) {
+              console.error('Error unregistering participant:', err);
+            } finally {
+              btn.disabled = false;
+            }
+          });
+        });
 
         // Add option to select dropdown
         const option = document.createElement("option");
