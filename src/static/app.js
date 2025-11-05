@@ -4,6 +4,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Helper to escape HTML in strings
+  function escapeHtml(str) {
+    if (typeof str !== "string") return "";
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -20,14 +31,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Build participants fragment
+        let participantsHTML = "";
+        if (Array.isArray(details.participants) && details.participants.length > 0) {
+          // Build participants list with a delete button for each participant
+          participantsHTML = `<ul class="participants-list">` +
+            details.participants
+              .map((p) =>
+                `<li class="participant-item"><span class="participant-email">${escapeHtml(p)}</span>` +
+                `<button class="delete-participant" title="Unregister">✖</button></li>`
+              )
+              .join("") +
+            `</ul>`;
+        } else {
+          participantsHTML = `<p class="no-participants">No participants yet.</p>`;
+        }
+
         activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
+          <h4>${escapeHtml(name)}</h4>
+          <p>${escapeHtml(details.description)}</p>
+          <p><strong>Schedule:</strong> ${escapeHtml(details.schedule)}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <h5>Participants</h5>
+            ${participantsHTML}
+          </div>
         `;
 
         activitiesList.appendChild(activityCard);
+
+        // Attach unregister handlers to the delete buttons we just rendered
+        const deleteButtons = activityCard.querySelectorAll('.delete-participant');
+        deleteButtons.forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            // Find the participant email from the sibling span (unescaped text)
+            const li = btn.closest('.participant-item');
+            if (!li) return;
+            const emailSpan = li.querySelector('.participant-email');
+            if (!emailSpan) return;
+            const email = emailSpan.textContent.trim();
+
+            // Disable button while request is in-flight
+            btn.disabled = true;
+
+            try {
+              const resp = await fetch(
+                `/activities/${encodeURIComponent(name)}/unregister?email=${encodeURIComponent(email)}`,
+                { method: 'POST' }
+              );
+
+              if (resp.ok) {
+                // Refresh the activities to reflect the change
+                fetchActivities();
+              } else {
+                // Try to show error in console and keep UI stable
+                const data = await resp.json().catch(() => ({}));
+                console.error('Failed to unregister:', data);
+              }
+            } catch (err) {
+              console.error('Error unregistering participant:', err);
+            } finally {
+              btn.disabled = false;
+            }
+          });
+        });
 
         // Add option to select dropdown
         const option = document.createElement("option");
@@ -62,6 +129,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Refresh activities to show updated participants/availability
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
